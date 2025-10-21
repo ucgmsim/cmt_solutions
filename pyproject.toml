@@ -3,17 +3,21 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "PACKAGE NAME HERE"
+name = "cmt_solutions"
 authors = [
     {name = "QuakeCoRE" },
 ]
-description = "PACKAGE DESCRIPTION HERE"
+description = "Provides access to a range of CMT solutions for seismic events in New Zealand."
 readme = "README.md"
 requires-python = ">=3.9"
 dynamic = ["version", "dependencies"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["cmt_solutions*"]
 
 [tool.ruff.lint]
 extend-select = [

@@ -1,0 +1,1 @@
+This is the CMT solutions repository for the New Zealand Ground-motion Database (NZ GMDB) John Townend Relocation/CMT Study.
