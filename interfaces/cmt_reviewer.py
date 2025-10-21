@@ -4,12 +4,10 @@ import pandas as pd
 import pydeck as pdk
 from pathlib import Path
 
+from cmt_solutions import cmt_data
 from source_modelling.community_fault_model import community_fault_model_as_geodataframe
 from source_modelling import magnitude_scaling
 from source_modelling.sources import Plane
-from nzgmdb.management import config as cfg
-from nzgmdb.management.data_registry import NZGMDB_DATA
-from cmt_solutions import cmt_data
 
 
 from shapely.geometry import LineString, MultiLineString
@@ -174,6 +172,10 @@ def render_event_review(event_id, fault_gdf, cmt_gdf):
 
     # --- Event header ---
     st.subheader(f"Event {event_id} Mw {event.Mw:.1f} Depth {event.CD:.1f} km")
+
+    # Check if the event has already been reviewed
+    if event.get("reviewed", False):
+        st.info(f"This event has already been reviewed by {event.get('reviewer', 'unknown')}.")
 
     # --- Build fault DataFrame for PyDeck (recreate compactly to keep function self-contained) ---
     all_lines = []
@@ -379,7 +381,7 @@ if username:
         value=st.session_state.mw_range,
         step=0.1,
     )
-    show_reviewed = st.sidebar.checkbox(
+    st.session_state.show_reviewed = st.sidebar.checkbox(
         "Show reviewed CMT solutions", value=st.session_state.show_reviewed
     )
     if st.sidebar.button("Apply filters"):
