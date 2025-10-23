@@ -356,7 +356,7 @@ if "filtered_ids" not in st.session_state:
 if "pos" not in st.session_state:
     st.session_state.pos = 0
 if "output_file" not in st.session_state:
-    st.session_state.output_file = Path(__file__).parent / "cmt_reviewed.csv"
+    st.session_state.output_file = cmt_data.CMT_DATA_PATH
 
 
 
@@ -386,7 +386,9 @@ if username:
     )
     if st.sidebar.button("Apply filters"):
         # Reload cmt_work from original to reset any prior filtering
-        st.session_state.cmt_work = cmt_gdf.copy()
+        cmt_df = cmt_data.get_cmt_data()
+        cmt_df = cmt_df.set_index("PublicID")
+        st.session_state.cmt_work = cmt_df.copy()
         # filter ids and reset position to first
         st.session_state.mw_range = mw_range
         lo, hi = mw_range
@@ -399,12 +401,6 @@ if username:
         st.session_state.filtered_ids = list(filtered.index)
         st.session_state.pos = 0
         st.rerun()
-
-    st.sidebar.write("Applying filters will examine from the original CMT_solutions.csv not from the current selected output file and will 'reset' your progress. However it will not wipe any of your selections to your desired output file as that is done on the fly as you select nodal planes.")
-
-    output_file = st.sidebar.text_input(
-        "Output CSV file", value=st.session_state.output_file
-    )
 
     # If filtered list is empty, show message
     if len(st.session_state.filtered_ids) == 0:
