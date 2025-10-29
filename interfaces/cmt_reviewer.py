@@ -439,7 +439,7 @@ if username:
         current_id = st.session_state.filtered_ids[pos]
 
         # Select box to jump to any event in current filtered list
-        event_id = st.selectbox("Select Event (PublicID)", options=st.session_state.filtered_ids, index=pos, key="event_select")
+        event_id = st.selectbox("Select Event", options=st.session_state.filtered_ids, index=pos, key="event_select")
 
         # Sync pos if user selected different event
         if event_id != current_id:
