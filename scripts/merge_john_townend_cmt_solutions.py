@@ -2,13 +2,14 @@
 This script merges the John Townend CMT solutions into the main CMT Solutions.
 """
 
-from cmt_solutions import cmt_data
-import pandas as pd
-import typer
-import requests
 import io
 from datetime import datetime
 
+import pandas as pd
+import requests
+import typer
+
+from cmt_solutions import cmt_data
 from qcore import cli
 
 app = typer.Typer(pretty_exceptions_enable=False)

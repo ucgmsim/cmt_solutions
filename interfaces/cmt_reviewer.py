@@ -1,16 +1,13 @@
 import numpy as np
-import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import streamlit as st
 from shapely.geometry import LineString, MultiLineString
 
 from cmt_solutions import cmt_data
-from source_modelling.community_fault_model import community_fault_model_as_geodataframe
 from source_modelling import magnitude_scaling
+from source_modelling.community_fault_model import community_fault_model_as_geodataframe
 from source_modelling.sources import Plane
-
-
-
 
 st.set_page_config(layout="wide")
 
@@ -55,6 +52,22 @@ def split_dateline_shapely(geom: LineString) -> LineString or MultiLineString:
 
 # corners expected as a (4,2) array from `np1.corners[:, :2]` etc.
 def segments_from_corners(corners: list, strike: float, color: list, segments_per_line: int = 20, keep_stride: int = 2):
+    """
+    Create solid and dashed line layers from the corners of a fault plane.
+
+    Parameters
+    ----------
+    corners : list
+        List of four (lon, lat) corner coordinates of the fault plane.
+    strike : float
+        Strike angle of the fault plane in degrees.
+    color : list
+        RGB color for the line layers.
+    segments_per_line : int, optional
+        Number of segments to divide each dashed line into.
+    keep_stride : int, optional
+        Stride for keeping segments to simulate dashes.
+    """
     corners = np.asarray(corners)
     if corners.shape != (4, 2):
         raise ValueError("Expected corners shape (4,2)")

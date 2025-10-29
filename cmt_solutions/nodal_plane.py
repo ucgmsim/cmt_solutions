@@ -4,8 +4,8 @@ Useful as the John Townend dataset originally had only a single nodal plane prov
 """
 
 import numpy as np
-from obspy.imaging import beachball
 import pandas as pd
+from obspy.imaging import beachball
 
 
 def conjugate_nodal_plane(strike: float, dip: float, rake: float):
