@@ -139,44 +139,6 @@ def load_data():
     cmt_df = cmt_data.get_cmt_data()
     cmt_df = cmt_df.set_index("PublicID")
 
-    # # Load CMT solutions
-    # modified_cmt_df = pd.read_csv(
-    #     NZGMDB_DATA.fetch("GeoNet_CMT_solutions_20201129_PreferredNodalPlane_v1.csv")
-    # )
-    #
-    # config = cfg.Config()
-    # geonet_cmt_df = pd.read_csv(config.get_value("cmt_url"), dtype={"PublicID": str})
-    #
-    # # Merge updates
-    # geonet_cmt_df = geonet_cmt_df.set_index("PublicID")
-    # modified_cmt_df = modified_cmt_df.set_index("PublicID")
-    # geonet_cmt_df.update(modified_cmt_df)
-
-    return fault_gdf, cmt_df
-
-
-def render_event_review(event_id, fault_gdf, cmt_gdf):
-    """
-    Render the full review UI for a single event_id.
-    - event_id: index value in cmt_gdf
-    - fault_gdf: GeoDataFrame with fault traces (EPSG:4326) and attributes used for tooltips
-    - cmt_gdf: DataFrame indexed by PublicID with event fields used below
-    - output_file: CSV file to append review results to (`cmt_reviewed.csv` by default)
-    Returns: chosen plane as "1" or "2", or None if nothing chosen or event missing.
-    """
-    if event_id not in cmt_gdf.index:
-        st.error(f"Event {event_id} not found in provided cmt_gdf")
-        return None
-
-    event = cmt_gdf.loc[event_id]
-
-    # --- Event header ---
-    st.subheader(f"Event {event_id} Mw {event.Mw:.1f} Depth {event.CD:.1f} km")
-
-    # Check if the event has already been reviewed
-    if event.get("reviewed", False):
-        st.info(f"This event has already been reviewed by {event.get('reviewer', 'unknown')}.")
-
     # --- Build fault DataFrame for PyDeck (recreate compactly to keep function self-contained) ---
     all_lines = []
     fault_names = []
@@ -221,6 +183,31 @@ def render_event_review(event_id, fault_gdf, cmt_gdf):
         + fault_df["rake_range"].astype(str)
         + "</div>"
     )
+
+    return fault_df, cmt_df
+
+
+def render_event_review(event_id, fault_gdf, cmt_gdf):
+    """
+    Render the full review UI for a single event_id.
+    - event_id: index value in cmt_gdf
+    - fault_gdf: GeoDataFrame with fault traces (EPSG:4326) and attributes used for tooltips
+    - cmt_gdf: DataFrame indexed by PublicID with event fields used below
+    - output_file: CSV file to append review results to (`cmt_reviewed.csv` by default)
+    Returns: chosen plane as "1" or "2", or None if nothing chosen or event missing.
+    """
+    if event_id not in cmt_gdf.index:
+        st.error(f"Event {event_id} not found in provided cmt_gdf")
+        return None
+
+    event = cmt_gdf.loc[event_id]
+
+    # --- Event header ---
+    st.subheader(f"Event {event_id} Mw {event.Mw:.1f} Depth {event.CD:.1f} km")
+
+    # Check if the event has already been reviewed
+    if event.get("reviewed", False):
+        st.info(f"This event has already been reviewed by {event.get('reviewer', 'unknown')}.")
 
     fault_layer = pdk.Layer(
         "PathLayer",
@@ -329,7 +316,7 @@ def render_event_review(event_id, fault_gdf, cmt_gdf):
 
     return choice
 
-fault_gdf, cmt_gdf = load_data()
+fault_df, cmt_gdf = load_data()
 
 # compute global Mw bounds
 _global_min_mw = float(cmt_gdf["Mw"].min())
@@ -420,7 +407,7 @@ if username:
             current_id = event_id
 
         # Render the review UI for current event
-        choice = render_event_review(current_id, fault_gdf, st.session_state.cmt_work)
+        choice = render_event_review(current_id, fault_df, st.session_state.cmt_work)
 
         # Navigation and actions
         nav_col1, nav_col2 = st.columns([1,1])
@@ -451,33 +438,38 @@ if username:
             st.session_state.cmt_work.at[rid, "reviewed"] = True
             st.session_state.cmt_work.at[rid, "reviewer"] = reviewer
 
-            # Set the PreferredPlane based on user choice
-            s1 = st.session_state.cmt_work.at[rid, "strike1"]
-            d1 = st.session_state.cmt_work.at[rid, "dip1"]
-            r1 = st.session_state.cmt_work.at[rid, "rake1"]
-            s2 = st.session_state.cmt_work.at[rid, "strike2"]
-            d2 = st.session_state.cmt_work.at[rid, "dip2"]
-            r2 = st.session_state.cmt_work.at[rid, "rake2"]
+            if choice == "2":
+                # Swap plane1 and plane2 columns to make plane2 the preferred one
+                cols1 = ["strike1", "dip1", "rake1"]
+                cols2 = ["strike2", "dip2", "rake2"]
+                plane1_values = st.session_state.cmt_work.loc[rid, cols1].values.copy()
+                st.session_state.cmt_work.loc[rid, cols1] = st.session_state.cmt_work.loc[rid, cols2].values
+                st.session_state.cmt_work.loc[rid, cols2] = plane1_values
+            #
+            # # Set the PreferredPlane based on user choice
+            # s1 = st.session_state.cmt_work.at[rid, "strike1"]
+            # d1 = st.session_state.cmt_work.at[rid, "dip1"]
+            # r1 = st.session_state.cmt_work.at[rid, "rake1"]
+            # s2 = st.session_state.cmt_work.at[rid, "strike2"]
+            # d2 = st.session_state.cmt_work.at[rid, "dip2"]
+            # r2 = st.session_state.cmt_work.at[rid, "rake2"]
+            #
+            # if choice == "1":
+            #     pref, other = (s1, d1, r1), (s2, d2, r2)
+            # else:
+            #     pref, other = (s2, d2, r2), (s1, d1, r1)
+            #
+            # st.session_state.cmt_work.at[rid, "strike1"] = pref[0]
+            # st.session_state.cmt_work.at[rid, "dip1"] = pref[1]
+            # st.session_state.cmt_work.at[rid, "rake1"] = pref[2]
+            # st.session_state.cmt_work.at[rid, "strike2"] = other[0]
+            # st.session_state.cmt_work.at[rid, "dip2"] = other[1]
+            # st.session_state.cmt_work.at[rid, "rake2"] = other[2]
 
-            if choice == "1":
-                pref, other = (s1, d1, r1), (s2, d2, r2)
-            else:
-                pref, other = (s2, d2, r2), (s1, d1, r1)
-
-            st.session_state.cmt_work.at[rid, "strike1"] = pref[0]
-            st.session_state.cmt_work.at[rid, "dip1"] = pref[1]
-            st.session_state.cmt_work.at[rid, "rake1"] = pref[2]
-            st.session_state.cmt_work.at[rid, "strike2"] = other[0]
-            st.session_state.cmt_work.at[rid, "dip2"] = other[1]
-            st.session_state.cmt_work.at[rid, "rake2"] = other[2]
-
-            try:
-                st.session_state.cmt_work.to_csv(
-                    st.session_state.output_file, index=True
-                )
-                st.success(f"Saved review for {event_id} (Plane {choice})")
-            except Exception as e:
-                st.error(f"Failed to save `{st.session_state.output_file}`: {e}")
+            st.session_state.cmt_work.to_csv(
+                st.session_state.output_file, index=True
+            )
+            st.success(f"Saved review for {event_id} (Plane {choice})")
 
             # Always advance to the next index in the filtered list unless we're at the last one
             last_index = len(st.session_state.filtered_ids) - 1

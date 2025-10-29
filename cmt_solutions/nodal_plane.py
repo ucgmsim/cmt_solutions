@@ -3,6 +3,7 @@ Contains code to calculate the other nodal plane for earthquake focal mechanisms
 Useful as the John Townend dataset originally had only a single nodal plane provided.
 """
 
+import numpy as np
 import pandas as pd
 from obspy.imaging import beachball
 
@@ -65,23 +66,15 @@ def add_conjugate_nodal_planes(df: pd.DataFrame,
         DataFrame with additional columns for the conjugate nodal plane.
     """
 
-    s2_list = []
-    d2_list = []
-    r2_list = []
+    s2, d2, r2 = zip(
+        *(
+            conjugate_nodal_plane(s, d, r)
+            for s, d, r in zip(df[strike_col], df[dip_col], df[rake_col])
+        )
+    )
 
-    for _, row in df.iterrows():
-        s1 = row[strike_col]
-        d1 = row[dip_col]
-        r1 = row[rake_col]
-
-        s2, d2, r2 = conjugate_nodal_plane(s1, d1, r1)
-
-        s2_list.append(s2)
-        d2_list.append(d2)
-        r2_list.append(r2)
-
-    df["strike2"] = s2_list
-    df["dip2"] = d2_list
-    df["rake2"] = r2_list
+    df["strike2"] = np.asarray(s2)
+    df["dip2"] = np.asarray(d2)
+    df["rake2"] = np.asarray(r2)
 
     return df
