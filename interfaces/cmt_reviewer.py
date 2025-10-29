@@ -2,7 +2,7 @@ import numpy as np
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
-from pathlib import Path
+from shapely.geometry import LineString, MultiLineString
 
 from cmt_solutions import cmt_data
 from source_modelling.community_fault_model import community_fault_model_as_geodataframe
@@ -10,13 +10,24 @@ from source_modelling import magnitude_scaling
 from source_modelling.sources import Plane
 
 
-from shapely.geometry import LineString, MultiLineString
 
 
 st.set_page_config(layout="wide")
 
-def split_dateline_shapely(geom):
-    """Split geometry at the dateline (±180°)."""
+def split_dateline_shapely(geom: LineString) -> LineString or MultiLineString:
+    """
+    Split geometry at the dateline (±180°).
+
+    Parameters
+    ----------
+    geom : LineString
+        Input LineString geometry.
+
+    Returns
+    -------
+    LineString or MultiLineString
+        Geometry split at the dateline if necessary.
+    """
     if geom.is_empty:
         return geom
     coords = list(geom.coords)
@@ -43,7 +54,7 @@ def split_dateline_shapely(geom):
 
 
 # corners expected as a (4,2) array from `np1.corners[:, :2]` etc.
-def segments_from_corners(corners, strike, color, segments_per_line=20, keep_stride=2):
+def segments_from_corners(corners: list, strike: float, color: list, segments_per_line: int = 20, keep_stride: int = 2):
     corners = np.asarray(corners)
     if corners.shape != (4, 2):
         raise ValueError("Expected corners shape (4,2)")
@@ -66,7 +77,7 @@ def segments_from_corners(corners, strike, color, segments_per_line=20, keep_str
         lat = corners[:, 0]
         lon = corners[:, 1]
 
-    def row(i, j):
+    def row(i: int, j: int):
         return {
             "lon1": float(lon[i]),
             "lat1": float(lat[i]),
@@ -127,8 +138,17 @@ def segments_from_corners(corners, strike, color, segments_per_line=20, keep_str
     return solid_layer, dashed_layer
 
 
-@st.cache_data
 def load_data():
+    """
+    Loads the fault model and CMT data, processes them for visualization.
+
+    Returns
+    -------
+    fault_df : pd.DataFrame
+        DataFrame containing fault traces and attributes for visualization.
+    cmt_df : pd.DataFrame
+        DataFrame containing CMT data indexed by PublicID.
+    """
     # Load fault model
     fault_gdf = community_fault_model_as_geodataframe()
     fault_gdf = fault_gdf.to_crs(epsg=4326)
@@ -187,14 +207,21 @@ def load_data():
     return fault_df, cmt_df
 
 
-def render_event_review(event_id, fault_gdf, cmt_gdf):
+def render_event_review(event_id: str, cmt_gdf: pd.DataFrame) -> str or None:
     """
     Render the full review UI for a single event_id.
-    - event_id: index value in cmt_gdf
-    - fault_gdf: GeoDataFrame with fault traces (EPSG:4326) and attributes used for tooltips
-    - cmt_gdf: DataFrame indexed by PublicID with event fields used below
-    - output_file: CSV file to append review results to (`cmt_reviewed.csv` by default)
-    Returns: chosen plane as "1" or "2", or None if nothing chosen or event missing.
+
+    Parmeters
+    ----------
+    event_id : str
+        index value in cmt_gdf
+    cmt_gdf : pd.DataFrame
+        DataFrame containing CMT data indexed by PublicID.
+
+    Returns
+    -------
+    str or None
+        "1" or "2" if user selected a nodal plane, None otherwise.
     """
     if event_id not in cmt_gdf.index:
         st.error(f"Event {event_id} not found in provided cmt_gdf")
@@ -274,7 +301,7 @@ def render_event_review(event_id, fault_gdf, cmt_gdf):
     )
 
     # --- Nodal plane selection UI and persistence ---
-    def plane_html(title, strike, dip, rake, border_color, text_color):
+    def plane_html(title: str, strike: float, dip: float, rake: float, border_color: str, text_color: str):
         return f"""
         <div style="border:2px solid {border_color}; padding:10px; border-radius:8px; margin-bottom:8px;">
           <div style="font-weight:600; color:{text_color}; margin-bottom:6px;">{title}</div>
@@ -338,7 +365,7 @@ if "filtered_ids" not in st.session_state:
         & (st.session_state.cmt_work["Mw"] <= hi)
     ]
     if not st.session_state.show_reviewed:
-        filtered_df = filtered_df[filtered_df["reviewed"] == False]
+        filtered_df = filtered_df[not filtered_df["reviewed"]]
     st.session_state.filtered_ids = list(filtered_df.index)
 if "pos" not in st.session_state:
     st.session_state.pos = 0
@@ -384,7 +411,7 @@ if username:
             & (st.session_state.cmt_work["Mw"] <= hi)
         ]
         if not st.session_state.show_reviewed:
-            filtered = filtered[filtered["reviewed"] == False]
+            filtered = filtered[not filtered["reviewed"]]
         st.session_state.filtered_ids = list(filtered.index)
         st.session_state.pos = 0
         st.rerun()
@@ -445,26 +472,6 @@ if username:
                 plane1_values = st.session_state.cmt_work.loc[rid, cols1].values.copy()
                 st.session_state.cmt_work.loc[rid, cols1] = st.session_state.cmt_work.loc[rid, cols2].values
                 st.session_state.cmt_work.loc[rid, cols2] = plane1_values
-            #
-            # # Set the PreferredPlane based on user choice
-            # s1 = st.session_state.cmt_work.at[rid, "strike1"]
-            # d1 = st.session_state.cmt_work.at[rid, "dip1"]
-            # r1 = st.session_state.cmt_work.at[rid, "rake1"]
-            # s2 = st.session_state.cmt_work.at[rid, "strike2"]
-            # d2 = st.session_state.cmt_work.at[rid, "dip2"]
-            # r2 = st.session_state.cmt_work.at[rid, "rake2"]
-            #
-            # if choice == "1":
-            #     pref, other = (s1, d1, r1), (s2, d2, r2)
-            # else:
-            #     pref, other = (s2, d2, r2), (s1, d1, r1)
-            #
-            # st.session_state.cmt_work.at[rid, "strike1"] = pref[0]
-            # st.session_state.cmt_work.at[rid, "dip1"] = pref[1]
-            # st.session_state.cmt_work.at[rid, "rake1"] = pref[2]
-            # st.session_state.cmt_work.at[rid, "strike2"] = other[0]
-            # st.session_state.cmt_work.at[rid, "dip2"] = other[1]
-            # st.session_state.cmt_work.at[rid, "rake2"] = other[2]
 
             st.session_state.cmt_work.to_csv(
                 st.session_state.output_file, index=True

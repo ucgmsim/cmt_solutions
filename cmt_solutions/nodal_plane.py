@@ -4,8 +4,9 @@ Useful as the John Townend dataset originally had only a single nodal plane prov
 """
 
 import numpy as np
-import pandas as pd
 from obspy.imaging import beachball
+import pandas as pd
+
 
 def conjugate_nodal_plane(strike: float, dip: float, rake: float):
     """
@@ -42,10 +43,12 @@ def conjugate_nodal_plane(strike: float, dip: float, rake: float):
     return s2, d2, r2
 
 
-def add_conjugate_nodal_planes(df: pd.DataFrame,
-                               strike_col: str = "strike1",
-                               dip_col: str = "dip1",
-                               rake_col: str = "rake1") -> pd.DataFrame:
+def add_conjugate_nodal_planes(
+    df: pd.DataFrame,
+    strike_col: str = "strike1",
+    dip_col: str = "dip1",
+    rake_col: str = "rake1",
+) -> pd.DataFrame:
     """
     Add conjugate nodal planes to a DataFrame containing focal mechanism data.
 
