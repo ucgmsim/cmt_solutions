@@ -1,0 +1,10 @@
+pandas
+typer
+numpy
+streamlit
+pydeck
+obspy
+shapely
+requests
+qcore @ git+https://github.com/ucgmsim/qcore.git
+source-modelling @ git+https://github.com/ucgmsim/source_modelling.git
