@@ -38,10 +38,6 @@ def download_earthquake_data(
     pd.DataFrame
         The dataframe with the earthquake data from the geonet website
     """
-    # Define bbox for New Zealand
-    # config = cfg.Config()
-    # bbox = ",".join([str(coord) for coord in config.get_value("bbox")])
-
     # Send API request for the date ranges required
     endpoint = (
         f"https://quakesearch.geonet.org.nz/count?startdate={start_date}&enddate={end_date}"
