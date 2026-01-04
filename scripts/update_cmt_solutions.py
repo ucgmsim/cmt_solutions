@@ -22,6 +22,7 @@ def update_cmt():
     # Add the review columns to the GeoNet data with default values
     geonet_cmt_df["reviewed"] = False
     geonet_cmt_df["reviewer"] = ""
+    geonet_cmt_df["source"] = "GeoNet"
 
     # Read the current CMT data
     current_cmt_df = pd.read_csv(CMT_DATA_PATH, dtype={"PublicID": str})
