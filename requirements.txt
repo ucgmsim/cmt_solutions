@@ -6,5 +6,5 @@ pydeck
 obspy
 shapely
 requests
-qcore-utils>=2025.12.1,
-source_modelling>=2025.12.1,
+qcore-utils>=2025.12.1
+source_modelling>=2025.12.1
