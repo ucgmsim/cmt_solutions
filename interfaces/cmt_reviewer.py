@@ -220,7 +220,43 @@ def load_data():
     return fault_df, cmt_df
 
 
-def render_event_review(event_id: str, cmt_gdf: pd.DataFrame) -> str or None:
+def _normalize_reviewed(col: pd.Series) -> pd.Series:
+    """
+    Normalize a pandas Series to boolean values for 'reviewed' status.
+
+    Parameters
+    ----------
+    col : pd.Series
+        Input Series with mixed types indicating reviewed status.
+
+    Returns
+    -------
+    pd.Series
+        Series with boolean values (True/False) for reviewed status.
+    """
+    # Accept booleans, 0/1, and common string variants like "FALSE"/"TRUE"
+    s = col.copy()
+
+    # If it's already boolean, keep it
+    if pd.api.types.is_bool_dtype(s):
+        return s.fillna(False)
+
+    # Handle numbers (0/1) cleanly
+    if pd.api.types.is_numeric_dtype(s):
+        return s.fillna(0).astype(int).astype(bool)
+
+    # Otherwise treat as strings
+    s = s.astype(str).str.strip().str.lower()
+    true_vals = {"true", "t", "1", "yes", "y"}
+    false_vals = {"false", "f", "0", "no", "n", "nan", "none", ""}
+
+    out = pd.Series(False, index=s.index, dtype=bool)
+    out[s.isin(true_vals)] = True
+    out[s.isin(false_vals)] = False
+    return out
+
+
+def render_event_review(event_id: str, cmt_gdf: pd.DataFrame, fault_df: pd.DataFrame) -> str or None:
     """
     Render the full review UI for a single event_id.
 
@@ -230,6 +266,8 @@ def render_event_review(event_id: str, cmt_gdf: pd.DataFrame) -> str or None:
         index value in cmt_gdf
     cmt_gdf : pd.DataFrame
         DataFrame containing CMT data indexed by PublicID.
+    fault_df : pd.DataFrame
+        DataFrame containing fault traces and attributes for visualization.
 
     Returns
     -------
@@ -377,8 +415,9 @@ if "filtered_ids" not in st.session_state:
         (st.session_state.cmt_work["Mw"] >= lo)
         & (st.session_state.cmt_work["Mw"] <= hi)
     ]
+    filtered_df["reviewed"] = _normalize_reviewed(filtered_df.get("reviewed", False))
     if not st.session_state.show_reviewed:
-        filtered_df = filtered_df[not filtered_df["reviewed"]]
+        filtered_df = filtered_df[~filtered_df["reviewed"]]
     st.session_state.filtered_ids = list(filtered_df.index)
 if "pos" not in st.session_state:
     st.session_state.pos = 0
@@ -423,8 +462,9 @@ if username:
             (st.session_state.cmt_work["Mw"] >= lo)
             & (st.session_state.cmt_work["Mw"] <= hi)
         ]
+        filtered["reviewed"] = _normalize_reviewed(filtered.get("reviewed", False))
         if not st.session_state.show_reviewed:
-            filtered = filtered[not filtered["reviewed"]]
+            filtered = filtered[~filtered["reviewed"]]
         st.session_state.filtered_ids = list(filtered.index)
         st.session_state.pos = 0
         st.rerun()
@@ -447,7 +487,7 @@ if username:
             current_id = event_id
 
         # Render the review UI for current event
-        choice = render_event_review(current_id, fault_df, st.session_state.cmt_work)
+        choice = render_event_review(current_id, cmt_gdf, fault_df)
 
         # Navigation and actions
         nav_col1, nav_col2 = st.columns([1,1])
