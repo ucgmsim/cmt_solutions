@@ -30,3 +30,11 @@ What you can do here
   ```bash
   python scripts/update_cmt_solutions.py
   ```
+
+- Run the automated 1-D CMT inversion (BayesISOLA) for a single event. See the details: [Auto CMT](Auto%20CMT.md) and the scripts in `auto_cmt/`.
+
+  Quick check / run:
+  ```bash
+  python auto_cmt/run_cmt.py --help
+  python auto_cmt/run_cmt.py 2026p576643 earthquake_source_table.csv ./2026p576643/cmt_1d
+  ```

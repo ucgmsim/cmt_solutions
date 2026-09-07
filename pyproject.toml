@@ -17,7 +17,11 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["cmt_solutions*"]
+include = ["cmt_solutions*", "auto_cmt*"]
+
+[tool.setuptools.package-data]
+# Bundle the default 3-D NZ velocity model CSV with the installed package.
+auto_cmt = ["*.csv"]
 
 [tool.ruff.lint]
 extend-select = [
