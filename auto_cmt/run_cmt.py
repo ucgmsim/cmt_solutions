@@ -4,7 +4,7 @@ Run the 1-D CMT inversion (BayesISOLA) for a single GeoNet event.
 
 import time
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Optional
 
 import pandas as pd
 import typer
@@ -30,12 +30,10 @@ MIN_DEPTH_MULTIPLIER = 0.3
 MAX_DEPTH_MULTIPLIER = 3.0
 RUPTURE_VELOCITY_M_S = 1000.0
 VELOCITY_SLOWEST_M_S = 1000.0
-
-DEFAULT_THREADS = 8  # tune to the number of cores available on the machine this runs on
+DEFAULT_THREADS = 8
 
 # 3-D NZ velocity model bundled with this package, used by default to build
-# station/path-specific 1-D Axitra models. Override with --nz-3dvm-path to
-# use a different copy.
+# station/path-specific 1-D Axitra models.
 DEFAULT_NZ_3DVM_PATH = Path(__file__).resolve().parent / "nz3dvm_2p3.csv"
 
 
@@ -65,7 +63,7 @@ def run_cmt(
     ] = DEFAULT_NZ_3DVM_PATH,
     threads: Annotated[int, typer.Option()] = DEFAULT_THREADS,
     min_radius_km: Annotated[float, typer.Option()] = 0.0,
-    max_radius_km: Annotated[float, typer.Option()] = None,
+    max_radius_km: Annotated[Optional[float], typer.Option()] = None,
 ) -> dict:
     """
     Run the 1-D CMT inversion for one GeoNet event.

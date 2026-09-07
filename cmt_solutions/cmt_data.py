@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
@@ -8,7 +9,7 @@ JOHN_TOWNEND_CMT_DATA_PATH = (
 )
 
 
-def get_cmt_data(event_id: str = None) -> pd.DataFrame:
+def get_cmt_data(event_id: Optional[str] = None) -> pd.DataFrame:
     """
     Load the CMT solutions dataset from the local CSV file.
 
