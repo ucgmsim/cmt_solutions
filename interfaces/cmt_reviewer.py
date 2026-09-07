@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 import pandas as pd
 import pydeck as pdk
@@ -30,7 +32,7 @@ def split_dateline_shapely(geom: LineString) -> LineString or MultiLineString:
     coords = list(geom.coords)
     parts = []
     current_part = [coords[0]]
-    for (lon1, lat1), (lon2, lat2) in zip(coords[:-1], coords[1:]):
+    for (lon1, lat1), (lon2, lat2) in itertools.pairwise(coords):
         if abs(lon2 - lon1) > 180:
             if lon1 > 0:
                 lon_cross = 180
