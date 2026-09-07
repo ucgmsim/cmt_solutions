@@ -4,7 +4,7 @@ Run the 1-D CMT inversion (BayesISOLA) for a single GeoNet event.
 
 import time
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import pandas as pd
 import typer
@@ -63,7 +63,7 @@ def run_cmt(
     ] = DEFAULT_NZ_3DVM_PATH,
     threads: Annotated[int, typer.Option()] = DEFAULT_THREADS,
     min_radius_km: Annotated[float, typer.Option()] = 0.0,
-    max_radius_km: Annotated[Optional[float], typer.Option()] = None,
+    max_radius_km: Annotated[float | None, typer.Option()] = None,
 ) -> dict:
     """
     Run the 1-D CMT inversion for one GeoNet event.

@@ -9,7 +9,7 @@ authors = [
 ]
 description = "Provides access to a range of CMT solutions for seismic events in New Zealand."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ["version", "dependencies"]
 
 [tool.setuptools.dynamic]
