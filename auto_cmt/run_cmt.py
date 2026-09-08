@@ -18,19 +18,8 @@ app = typer.Typer(pretty_exceptions_enable=False)
 
 # GeoNet's near-real-time FDSN service. The standard "GEONET" client is not
 # updated in near real time, so a just-happened event is not there yet -
-# --real-time queries this service first, falling back to "GEONET" per
-# station (e.g. once an event ages out of its short rolling buffer).
+# --real-time queries this service instead
 NRT_BASE_URL = "https://service-nrt.geonet.org.nz"
-
-CHANNELS = ("HH?", "BH?", "LH?")
-CHANNEL_PRIORITY = ("HH", "BH", "LH")
-TIME_UNC_S = 3.0
-MIN_DEPTH_KM = 3.0
-MIN_DEPTH_MULTIPLIER = 0.3
-MAX_DEPTH_MULTIPLIER = 3.0
-RUPTURE_VELOCITY_M_S = 1000.0
-VELOCITY_SLOWEST_M_S = 1000.0
-DEFAULT_THREADS = 8
 
 # 3-D NZ velocity model bundled with this package, used by default to build
 # station/path-specific 1-D Axitra models.
@@ -61,7 +50,7 @@ def run_cmt(
             dir_okay=False,
         ),
     ] = DEFAULT_NZ_3DVM_PATH,
-    threads: Annotated[int, typer.Option()] = DEFAULT_THREADS,
+    threads: Annotated[int, typer.Option()] = 8,
     min_radius_km: Annotated[float, typer.Option()] = 0.0,
     max_radius_km: Annotated[float | None, typer.Option()] = None,
 ) -> dict:
@@ -180,98 +169,41 @@ def run_cmt(
     )
 
     # -----------------------------------------------------------------
-    # Waveform acquisition. --real-time discovers stations and downloads
-    # waveforms/StationXML manually against the near-real-time client
-    # (falling back to GEONET), then hands the resulting station table
-    # straight to run_auto_cmt(waveform_source="local", ...). Otherwise
-    # run_auto_cmt is left to do the acquisition itself against the
-    # standard GEONET client - this is the path for any event already in
-    # GeoNet's archive.
-    # -----------------------------------------------------------------
-
-    if real_time:
-        client = [FDSNClient(base_url=NRT_BASE_URL), "GEONET"]
-
-        print("\nDownloading waveforms + StationXML (NRT client, falling back to GEONET)...")
-
-        _, station_df, download_log, _ = get_mseed_stationxml(
-            event_id, event_time, lon_event, lat_event, depth_km,
-            magnitude=mag_event,
-            output_dir=output_dir,
-            client=client,
-            min_radius_km=min_radius_km,
-            max_radius_km=max_radius_km,
-            ground_level=True,
-            channels=CHANNELS,
-            channel_priority=CHANNEL_PRIORITY,
-            time_unc_s=TIME_UNC_S,
-            min_depth_km=MIN_DEPTH_KM,
-            min_depth_multiplier=MIN_DEPTH_MULTIPLIER,
-            max_depth_multiplier=MAX_DEPTH_MULTIPLIER,
-            rupture_velocity_m_s=RUPTURE_VELOCITY_M_S,
-            velocity_slowest_m_s=VELOCITY_SLOWEST_M_S,
-            covariance="noise",
-            overwrite=False,
-            plot=True,
-            show=False,
-        )
-
-        print(f"Downloaded {len(station_df)} station(s):")
-        print(station_df[["station_id", "distance_km", "download_status"]].to_string(index=False))
-
-        if not download_log.empty:
-            failed = download_log[download_log["status"].isin(["download_failed", "client_failed"])]
-            if not failed.empty:
-                print(f"\n{len(failed)} station(s) failed to download - see "
-                      f"{metadata_path / 'download_log.csv'} for details.")
-
-        waveform_kwargs = {"waveform_source": "local", "station_df": station_df}
-    else:
-        waveform_kwargs = {"waveform_source": "fdsn", "client": "GEONET"}
-
-    # -----------------------------------------------------------------
     # Run the inversion.
     # -----------------------------------------------------------------
 
     print("\nRunning CMT inversion...")
     step_x_km = 1.0 if mag_event < 6.0 else 2.0
+    client = FDSNClient(base_url=NRT_BASE_URL) if real_time else "GEONET"
 
     run = run_auto_cmt(
-        event_id, event_time, lon_event, lat_event, depth_km, mag_event,
+        event_id,
+        event_time,
+        lon_event,
+        lat_event,
+        depth_km,
+        mag_event,
         output_dir=output_dir,
         velocity_model=nz_grid_ll,
-        gf_source="axitra",
-        **waveform_kwargs,
+        client=client,
         min_radius_km=min_radius_km,
         max_radius_km=max_radius_km,
-        ground_level=True,
-        channels=CHANNELS,
-        channel_priority=CHANNEL_PRIORITY,
         location_unc_km=1.0,
-        time_unc_s=TIME_UNC_S,
-        min_depth_km=MIN_DEPTH_KM,
-        min_depth_multiplier=MIN_DEPTH_MULTIPLIER,
-        max_depth_multiplier=MAX_DEPTH_MULTIPLIER,
+        time_unc_s=3.0,
+        min_depth_km=3.0,
+        min_depth_multiplier=0.3,
         step_x_km=step_x_km,
-        step_z_km=1.0,
-        max_grid_points=5000,
-        add_rupture_length=True,
-        rupture_velocity_m_s=RUPTURE_VELOCITY_M_S,
-        velocity_slowest_m_s=VELOCITY_SLOWEST_M_S,
         adaptive_grid_search={
             "adaptive_grid": True,
             "adaptive_refine_factor": 0,
         },
-        freqmin=0.02,
-        freqmax=0.05,
         threads=threads,
-        use_precalculated_Green="auto",
-        covariance="noise",
         crosscovariance=True,
-        n_uncertainty=None,
+        n_uncertainty=1000,
         plot=True,
         plot_preset="summary",
         show=False,
+        html_output=True,
         write_report=True,
     )
 
