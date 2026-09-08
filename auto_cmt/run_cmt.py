@@ -9,7 +9,7 @@ from typing import Annotated
 import pandas as pd
 import typer
 from BayesISOLA.gf_helpers import build_regular_velocity_grid
-from BayesISOLA.workflows import get_mseed_stationxml, run_auto_cmt
+from BayesISOLA.workflows import run_auto_cmt
 from obspy.clients.fdsn import Client as FDSNClient
 
 from qcore import cli
