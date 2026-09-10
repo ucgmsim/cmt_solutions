@@ -53,36 +53,19 @@ def run_cmt(
     threads: Annotated[int, typer.Option()] = 8,
     min_radius_km: Annotated[float, typer.Option()] = 0.0,
     max_radius_km: Annotated[float | None, typer.Option()] = None,
+    deviatoric: Annotated[bool, typer.Option(is_flag=True)] = False,
 ) -> dict:
     """
     Run the 1-D CMT inversion for one GeoNet event.
 
-    By default this queries GeoNet's standard "GEONET" FDSN client directly
-    (``run_auto_cmt(waveform_source="fdsn", client="GEONET")``), which works
-    for any event already in GeoNet's archive.
+    By default this queries GeoNet's standard "GEONET" FDSN client
+    (``run_auto_cmt(client="GEONET")``), which works for any event already
+    in GeoNet's archive.
 
-    Pass ``--real-time`` for a just-happened event that has not propagated to
-    the standard archive yet. In that mode the acquisition step is done
-    manually first:
-
-    1. Build an obspy FDSN client pointed at GeoNet's near-real-time service
-       (``service-nrt.geonet.org.nz``), tried before the standard "GEONET"
-       client so a just-happened event is picked up before it reaches the
-       standard archive.
-    2. Call ``BayesISOLA.workflows.get_mseed_stationxml()`` directly with
-       that client list. This is the exact same station-discovery/download
-       routine that ``run_auto_cmt(waveform_source="fdsn")`` calls
-       internally - calling it here lets us hand it the near-real-time
-       client first. ``get_mseed_stationxml`` discovers candidates from
-       every client in the list and, if a station's download fails under an
-       earlier client (e.g. too old for the near-real-time service's short
-       rolling buffer), retries it under the next one automatically. It
-       downloads miniSEED + StationXML under ``<output_dir>/raw`` and writes
-       station metadata under ``<output_dir>/metadata``, returning a station
-       table with local file paths.
-    3. Pass that station table into
-       ``run_auto_cmt(waveform_source="local", station_df=...)``, which
-       skips acquisition entirely and inverts the files already on disk.
+    Pass ``--real-time`` for a just-happened event that has not propagated
+    to the standard archive yet. This swaps in a client pointed at GeoNet's
+    near-real-time service (``service-nrt.geonet.org.nz``) instead, since
+    that service only holds a short rolling buffer of recent data.
 
     Parameters
     ----------
@@ -92,12 +75,10 @@ def run_cmt(
         CSV with the event row (evid, datetime, lat, lon, depth, mag, ...) -
         same schema as GeoNet's earthquake_source_table.csv.
     output_dir : Path
-        Directory raw/, metadata/, input/, results/, figures/ get written
-        under.
+        Output directory for the CMT inversion results.
     real_time : bool, optional
-        Use GeoNet's near-real-time FDSN service (falling back to the
-        standard client) instead of querying the standard "GEONET" client
-        directly. Use this for an event that has only just happened.
+        Query GeoNet's near-real-time FDSN client instead of the standard
+        "GEONET" client. Use this for an event that has only just happened.
     nz_3dvm_path : Path, optional
         3-D NZ velocity model CSV, used to build the station/path-specific
         1-D Axitra models. Defaults to the copy bundled with this package
@@ -107,8 +88,9 @@ def run_cmt(
     min_radius_km : float, optional
         Inner radius (km) of the station search annulus.
     max_radius_km : float, optional
-        Outer radius (km) of the station search annulus. Omit to resolve it
-        automatically from the event magnitude.
+        Outer radius (km) of the station search annulus.
+    deviatoric : bool, optional
+        Invert for a deviatoric moment tensor only (no isotropic component).
 
     Returns
     -------
@@ -119,43 +101,16 @@ def run_cmt(
     start_time = time.time()
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    raw_path = output_dir / "raw"
-    metadata_path = output_dir / "metadata"
     input_path = output_dir / "input"
     input_path.mkdir(parents=True, exist_ok=True)
 
-    print("Event directory :", output_dir)
-    print("Raw data        :", raw_path)
-    print("Metadata        :", metadata_path)
-    print("BayesISOLA input:", input_path)
-
-    # -----------------------------------------------------------------
-    # Event parameters
-    # -----------------------------------------------------------------
-
     event_df = pd.read_csv(event_csv_path)
+    assert(event_id == str(event_df["evid"].values[0])), f"event_id={event_id!r} does not match evid={event_df['evid'].values[0]!r} in {event_csv_path}"
 
-    if "evid" in event_df.columns and str(event_df["evid"].values[0]) != event_id:
-        print(f"WARNING: event_id={event_id!r} does not match evid="
-              f"{event_df['evid'].values[0]!r} in {event_csv_path}")
-
-    event_time = event_df["datetime"].values[0]
-    lon_event = event_df["lon"].values[0]
-    lat_event = event_df["lat"].values[0]
-    depth_km = event_df["depth"].values[0]
-    mag_event = event_df["mag"].values[0]
-
-    print(f"Event {event_id}: t={event_time}  lon={lon_event}  lat={lat_event}  "
-          f"depth={depth_km} km  mag={mag_event}")
-
-    # -----------------------------------------------------------------
-    # Velocity model
-    # -----------------------------------------------------------------
-
-    nz_3dvm = pd.read_csv(nz_3dvm_path)
-
+    # Build the velocity model grid from the 3-D NZ velocity model CSV.
+    print("\nBuilding velocity model grid")
     nz_grid_ll = build_regular_velocity_grid(
-        nz_3dvm,
+        pd.read_csv(nz_3dvm_path),
         x_col="Longitude",
         y_col="Latitude",
         depth_col="Depth(km_BSL)",
@@ -168,20 +123,17 @@ def run_cmt(
         interpolation_crs="EPSG:2193",
     )
 
-    # -----------------------------------------------------------------
-    # Run the inversion.
-    # -----------------------------------------------------------------
-
-    print("\nRunning CMT inversion...")
+    print("\nRunning CMT inversion")
+    mag_event = event_df["mag"].values[0]
     step_x_km = 1.0 if mag_event < 6.0 else 2.0
     client = FDSNClient(base_url=NRT_BASE_URL) if real_time else "GEONET"
 
     run = run_auto_cmt(
         event_id,
-        event_time,
-        lon_event,
-        lat_event,
-        depth_km,
+        event_df["datetime"].values[0],
+        event_df["lon"].values[0],
+        event_df["lat"].values[0],
+        event_df["depth"].values[0],
         mag_event,
         output_dir=output_dir,
         velocity_model=nz_grid_ll,
@@ -200,6 +152,7 @@ def run_cmt(
         threads=threads,
         crosscovariance=True,
         n_uncertainty=1000,
+        deviatoric=deviatoric,
         plot=True,
         plot_preset="summary",
         show=False,
@@ -207,21 +160,13 @@ def run_cmt(
         write_report=True,
     )
 
-    print("Complete")
     print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
 
-    results = run["results"]
-    print("\nCentroid:")
-    print(results["centroid"])
-    print("\nSummary:")
-    print(results["summary"])
-
-    # -----------------------------------------------------------------
     # Write a flat cmt_solution.csv summary, matching the GeoNet regional
     # CMT catalogue column layout: PublicID, Date, Latitude, Longitude,
     # strike1, dip1, rake1, strike2, dip2, rake2, ML, Mw, Mo, CD.
-    # -----------------------------------------------------------------
 
+    results = run["results"]
     centroid_row = results["centroid"].iloc[0]
     summary_row = results["summary"].iloc[0]
 
