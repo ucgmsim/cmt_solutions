@@ -4,7 +4,7 @@ This guide explains how to install and run the Streamlit CMT reviewer app and ho
 
 ## 1. Prerequisites
 
-- Python 3.9+ (use the same Python environment when running Streamlit as when you install the package).
+- Python 3.10+ (use the same Python environment when running Streamlit as when you install the package).
 - A virtual environment is recommended.
 - Install development requirements listed in `requirements.txt` (or adjust to your environment).
 
