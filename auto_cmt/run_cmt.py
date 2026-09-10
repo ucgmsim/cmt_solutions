@@ -104,8 +104,18 @@ def run_cmt(
     input_path = output_dir / "input"
     input_path.mkdir(parents=True, exist_ok=True)
 
+    # Load and check event csv fields
     event_df = pd.read_csv(event_csv_path)
-    assert(event_id == str(event_df["evid"].values[0])), f"event_id={event_id!r} does not match evid={event_df['evid'].values[0]!r} in {event_csv_path}"
+    required_cols = ["evid", "datetime", "lat", "lon", "depth", "mag"]
+    missing = [c for c in required_cols if c not in event_df.columns]
+    if missing:
+        raise ValueError(f"Missing column(s) {missing} in {event_csv_path}")
+
+    csv_evid = str(event_df["evid"].values[0])
+    if event_id != csv_evid:
+        raise ValueError(
+            f"event_id={event_id!r} does not match evid={csv_evid!r} in {event_csv_path}"
+        )
 
     # Build the velocity model grid from the 3-D NZ velocity model CSV.
     print("\nBuilding velocity model grid")
