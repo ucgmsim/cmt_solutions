@@ -87,6 +87,14 @@ Each call writes the full BayesISOLA output plus `cmt_solution.csv` into its out
 - `cmt_solution.csv` — a flat one-row summary matching the GeoNet regional CMT catalogue column layout (`PublicID`, `Date`, `Latitude`, `Longitude`, `strike1/dip1/rake1`, `strike2/dip2/rake2`, `ML`, `Mw`, `Mo`, `CD`).
 
 
+## 2b. Timing and profiling
+
+Every `run_cmt_inversion` call writes `results/timings.csv`, even if the inversion fails. It has one row per BayesISOLA stage, with `calls`, `inclusive_s`, `exclusive_s` (inclusive minus nested stages) and `percent` of the total. It also has an `other` row for untimed code and a `total` row.
+
+The stages are timed by temporarily wrapping BayesISOLA functions (`auto_cmt/timing.py`, `BAYESISOLA_STAGES`), so BayesISOLA itself is not modified. The stages are download, station selection, waveform loading, mouse detection, station velocity models, data processing, filtering, Green's functions, adaptive grid reruns, covariance, MT inversion, jackknife, results/uncertainty, writing tables, plots and the HTML report. If a BayesISOLA upgrade renames one of these functions, that stage is skipped with a warning and the run continues.
+
+Pass `--profile` (or `profile=True`) to also write a cProfile dump to `results/profile.prof`, which you can view with `snakeviz results/profile.prof`.
+
 ## 3. Notes
 
 - `run_auto_cmt` and `get_mseed_stationxml` are BayesISOLA functions; see the [BayesISOLA documentation](https://geo.mff.cuni.cz/~vackar/BayesISOLA/) for details on the inversion itself.

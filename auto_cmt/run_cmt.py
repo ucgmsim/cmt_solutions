@@ -2,7 +2,9 @@
 Run the 1-D CMT inversion (BayesISOLA) for a single GeoNet event.
 """
 
+import cProfile
 import time
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -12,6 +14,7 @@ from BayesISOLA.gf_helpers import build_regular_velocity_grid
 from BayesISOLA.workflows import run_auto_cmt
 from obspy.clients.fdsn import Client as FDSNClient
 
+from auto_cmt.timing import PROFILE_FILENAME, TIMINGS_FILENAME, StageTimer
 from qcore import cli
 
 app = typer.Typer(pretty_exceptions_enable=False)
@@ -183,9 +186,13 @@ def run_cmt_inversion(
     azimuth_control: bool = False,
     drop_stations: list[str] | None = None,
     deviatoric: bool = False,
+    profile: bool = False,
 ) -> dict:
     """
     Run a single BayesISOLA CMT inversion and write cmt_solution.csv.
+
+    Stage timings are always written to results/timings.csv, even if the
+    inversion fails.
 
     Parameters
     ----------
@@ -213,12 +220,16 @@ def run_cmt_inversion(
     deviatoric : bool, optional
         Invert for a deviatoric moment tensor only (no isotropic component),
         by default False.
+    profile : bool, optional
+        Also write a cProfile dump of the inversion to results/profile.prof,
+        by default False.
 
     Returns
     -------
     dict
         The ``run_auto_cmt`` return value; ``run["results"]`` holds the
-        curated centroid/summary/station-fit tables.
+        curated centroid/summary/station-fit tables and ``run["timings"]``
+        the stage timings.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "input").mkdir(parents=True, exist_ok=True)
@@ -227,45 +238,59 @@ def run_cmt_inversion(
     step_x_km = 1.0 if mag_event <= 5.0 else 2.0
     client = FDSNClient(base_url=NRT_BASE_URL) if real_time else "GEONET"
 
-    run = run_auto_cmt(
-        str(event_row["evid"]),
-        event_row["datetime"],
-        float(event_row["lon"]),
-        float(event_row["lat"]),
-        float(event_row["depth"]),
-        mag_event,
-        output_dir=output_dir,
-        velocity_model=velocity_model,
-        client=client,
-        min_radius_km=min_radius_km,
-        max_radius_km=max_radius_km,
-        location_unc_km=3.0,
-        time_unc_s=3.0,
-        min_depth_km=3.0,
-        min_depth_multiplier=0.3,
-        max_depth_multiplier=3.0,
-        step_x_km=step_x_km,
-        step_z_km=1.0,
-        adaptive_grid_search={
-            "adaptive_grid": True,
-            "adaptive_refine_factor": 0,
-        },
-        drop_stations=drop_stations or None,
-        azimuth_control=AZIMUTH_CONTROL if azimuth_control else None,
-        station_jackknife=STATION_JACKKNIFE,
-        freqmin=0.02,
-        freqmax=0.06,
-        threads=threads,
-        covariance="noise",
-        crosscovariance=True,
-        deviatoric=deviatoric,
-        n_uncertainty=1000,
-        plot=True,
-        plot_preset="summary",
-        show=False,
-        html_output=True,
-        write_report=True,
-    )
+    timer = StageTimer()
+    profiler = cProfile.Profile() if profile else nullcontext()
+    try:
+        with timer, profiler:
+            run = run_auto_cmt(
+                str(event_row["evid"]),
+                event_row["datetime"],
+                float(event_row["lon"]),
+                float(event_row["lat"]),
+                float(event_row["depth"]),
+                mag_event,
+                output_dir=output_dir,
+                velocity_model=velocity_model,
+                client=client,
+                min_radius_km=min_radius_km,
+                max_radius_km=max_radius_km,
+                location_unc_km=3.0,
+                time_unc_s=3.0,
+                min_depth_km=3.0,
+                min_depth_multiplier=0.3,
+                max_depth_multiplier=3.0,
+                step_x_km=step_x_km,
+                step_z_km=1.0,
+                adaptive_grid_search={
+                    "adaptive_grid": True,
+                    "adaptive_refine_factor": 0,
+                },
+                drop_stations=drop_stations or None,
+                azimuth_control=AZIMUTH_CONTROL if azimuth_control else None,
+                station_jackknife=STATION_JACKKNIFE,
+                freqmin=0.02,
+                freqmax=0.06,
+                threads=threads,
+                covariance="noise",
+                crosscovariance=True,
+                deviatoric=deviatoric,
+                n_uncertainty=1000,
+                plot=True,
+                plot_preset="summary",
+                show=False,
+                html_output=True,
+                write_report=True,
+            )
+    finally:
+        # Keep timings for failed runs too
+        results_dir = output_dir / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        timings_df = timer.to_dataframe()
+        timings_df.to_csv(results_dir / TIMINGS_FILENAME, index=False)
+        if profile:
+            profiler.dump_stats(results_dir / PROFILE_FILENAME)
+        print(f"\nCMT stage timings:\n{timings_df.to_string(index=False)}")
+    run["timings"] = timings_df
 
     cmt_solution_path = write_cmt_solution_csv(run, event_row, output_dir)
     print(f"\nWrote CMT solution summary to {cmt_solution_path}")
@@ -303,6 +328,7 @@ def run_cmt(
     azimuth_control: Annotated[bool, typer.Option(is_flag=True)] = False,
     drop_stations: Annotated[list[str] | None, typer.Option()] = None,
     deviatoric: Annotated[bool, typer.Option(is_flag=True)] = False,
+    profile: Annotated[bool, typer.Option(is_flag=True)] = False,
 ) -> dict:
     """
     Run the 1-D CMT inversion for one GeoNet event.
@@ -342,6 +368,8 @@ def run_cmt(
         Stations to exclude (repeatable), as STA, NET.STA or NET.STA.LOC.
     deviatoric : bool, optional
         Invert for a deviatoric moment tensor only (no isotropic component).
+    profile : bool, optional
+        Also write a cProfile dump of the inversion to results/profile.prof.
 
     Returns
     -------
@@ -368,6 +396,7 @@ def run_cmt(
         azimuth_control=azimuth_control,
         drop_stations=drop_stations,
         deviatoric=deviatoric,
+        profile=profile,
     )
 
     print(f"Elapsed time: {time.time() - start_time:.2f} seconds")
