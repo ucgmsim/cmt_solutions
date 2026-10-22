@@ -8,6 +8,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from typing import Annotated, Any
 
+import matplotlib
 import pandas as pd
 import typer
 from BayesISOLA.gf_helpers import build_regular_velocity_grid
@@ -233,6 +234,11 @@ def run_cmt_inversion(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "input").mkdir(parents=True, exist_ok=True)
+
+    # BayesISOLA plots with pyplot and forks inversion workers. An interactive
+    # backend (TkAgg when a display is available) is not fork-safe and aborts
+    # the run with "Tcl_AsyncDelete: async handler deleted by the wrong thread"
+    matplotlib.use("Agg")
 
     mag_event = float(event_row["mag"])
     step_x_km = 1.0 if mag_event <= 5.0 else 2.0
