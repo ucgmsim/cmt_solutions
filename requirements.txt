@@ -1,6 +1,7 @@
 pandas
 typer
 numpy
+matplotlib
 streamlit
 pydeck
 obspy
