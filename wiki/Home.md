@@ -22,10 +22,10 @@ What you can do here
   Quick check / run:
   ```bash
   python scripts/merge_john_townend_cmt_solutions.py --help
-  python scripts/merge_john_townend_cmt_solutions.py data/john_townend_np2.csv
+  python scripts/merge_john_townend_cmt_solutions.py cmt_solutions/data/john_townend_np2.csv
   ```
 
-- Update the canonical CMT solutions from GeoNet (writes `data/CMT_solutions.csv`):
+- Update the canonical CMT solutions from GeoNet (writes `cmt_solutions/data/CMT_solutions.csv`):
 
   ```bash
   python scripts/update_cmt_solutions.py

@@ -2,10 +2,9 @@ from pathlib import Path
 
 import pandas as pd
 
-CMT_DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "CMT_solutions.csv"
-JOHN_TOWNEND_CMT_DATA_PATH = (
-    Path(__file__).resolve().parent.parent / "data" / "john_townend_np2.csv"
-)
+DATA_DIR = Path(__file__).resolve().parent / "data"
+CMT_DATA_PATH = DATA_DIR / "CMT_solutions.csv"
+JOHN_TOWNEND_CMT_DATA_PATH = DATA_DIR / "john_townend_np2.csv"
 
 
 def get_cmt_data(event_id: str | None = None) -> pd.DataFrame:

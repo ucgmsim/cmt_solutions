@@ -48,7 +48,7 @@ The application window should appear in your web browser and look similar to the
 
 ## 5. After reviewing
 
-When you've finished reviewing the events you wanted to check, the reviewed results are saved in the `CMT_solutions.csv` file in the `data` directory.
+When you've finished reviewing the events you wanted to check, the reviewed results are saved in the `CMT_solutions.csv` file in the `cmt_solutions/data` directory.
 
 To contribute your reviewed results back into the repository:
 
