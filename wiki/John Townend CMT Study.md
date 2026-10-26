@@ -91,7 +91,7 @@ To achieve this the following algorithm is used in the repository (implemented i
 4. For each candidate GeoNet row within the time threshold, compute absolute latitude, longitude and depth differences with the Townend row. If all three differences are within the allowed thresholds, select that GeoNet `publicid` as the match for the Townend row and stop searching for that row.
 5. Rows that do not find any GeoNet match are dropped (the script only keeps Townend rows where a `PublicID` was assigned).
 6. The Townend table columns are renamed to match the project's CMT table (for example `strike.nll` → `strike1`, `dip.nll` → `dip1`, `rake.nll` → `rake1`, etc.), the Townend `Date` column is formatted as `%Y%m%d%H%M%S`, and `reviewed` is set to `False`.
-7. The script concatenates the existing CMT solutions (`cmt_solutions.data/CMT_solutions.csv`) and the Townend table, then deduplicates by `PublicID` (keeping the first occurrence) and writes the resulting merged table back to the canonical CMT data path.
+7. The script concatenates the existing CMT solutions (`cmt_solutions/data/CMT_solutions.csv`) and the Townend table, then deduplicates by `PublicID` (keeping the first occurrence) and writes the resulting merged table back to the canonical CMT data path.
 
 Default matching thresholds (script defaults):
 

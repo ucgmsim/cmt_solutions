@@ -5,7 +5,7 @@ This repository contains the Centroid Moment Tensor (CMT) solutions and supporti
 Contents
 - `cmt_solutions/` — Python package with helpers for reading and working with CMT solution data (includes `cmt_data.py`, `nodal_plane.py`, etc.).
 - `auto_cmt/` — runs BayesISOLA's automated 1-D CMT inversion for a single GeoNet event (`run_cmt.py`), for any event already in GeoNet's archive or, with `--real-time`, for one that has only just happened. Installed as the `auto_cmt` package so callers can launch it as a subprocess (`python -m auto_cmt.run_cmt ...`); see NZGMDB's `nzgmdb.management.background` for an example launcher.
-- `data/` — CSV datasets (e.g. `CMT_solutions.csv`) used by the code and reviewer app.
+- `cmt_solutions/data/` — CSV datasets (e.g. `CMT_solutions.csv`) used by the code and reviewer app.
 - `interfaces/` — Streamlit UI for reviewing nodal planes (`cmt_reviewer.py`).
 - `scripts/` — utility scripts used to build or update datasets.
 - `wiki/` — documentation pages including the CMT review guide, the auto CMT guide, and the John Townend study notes.
@@ -54,7 +54,7 @@ Example: load all CMT solutions
 ```python
 from cmt_solutions.cmt_data import get_cmt_data
 
-df_all = get_cmt_data()  # returns a pandas.DataFrame with the full contents of data/CMT_solutions.csv
+df_all = get_cmt_data()  # returns a pandas.DataFrame with the full contents of cmt_solutions/data/CMT_solutions.csv
 print(len(df_all), "rows loaded")
 ```
 
@@ -78,6 +78,6 @@ This means consumers of `CMT_solutions.csv` can always treat the first plane as 
 
 Working with reviewed results
 
-The Streamlit reviewer writes the full working table (including `reviewed`, `reviewer`) to the output CSV you specify in the UI. You can use this file directly or replace `data/CMT_solutions.csv` with your reviewed file to share results.
+The Streamlit reviewer writes the full working table (including `reviewed`, `reviewer`) to the output CSV you specify in the UI. You can use this file directly or replace `cmt_solutions/data/CMT_solutions.csv` with your reviewed file to share results.
 
 To contribute reviewed results back to the repository follow the steps in the `wiki/CMT Review.md` guide.
