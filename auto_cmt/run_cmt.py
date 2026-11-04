@@ -3,6 +3,8 @@ Run the 1-D CMT inversion (BayesISOLA) for a single GeoNet event.
 """
 
 import cProfile
+import inspect
+import os
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -29,7 +31,8 @@ NRT_BASE_URL = "https://service-nrt.geonet.org.nz"
 # station/path-specific 1-D Axitra models.
 DEFAULT_NZ_3DVM_PATH = Path(__file__).resolve().parent / "nz3dvm_2p3.csv"
 
-DEFAULT_THREADS = 12
+# One Axitra process per core, more only oversubscribes the CPU
+DEFAULT_THREADS = os.cpu_count() or 8
 
 # Columns the event CSV must provide
 REQUIRED_EVENT_COLUMNS = ["evid", "datetime", "lat", "lon", "depth", "mag"]
@@ -188,10 +191,15 @@ def run_cmt_inversion(
     drop_stations: list[str] | None = None,
     deviatoric: bool = False,
     profile: bool = False,
+    station_df: Path | None = None,
+    gf_store_dir: Path | None = None,
+    overrides: dict[str, Any] | None = None,
 ) -> dict:
     """
     Run a single BayesISOLA CMT inversion and write cmt_solution.csv.
 
+    When the installed BayesISOLA supports ``solution_callback``, cmt_solution.csv
+    is written as soon as the solution exists, before figures and reports.
     Stage timings are always written to results/timings.csv, even if the
     inversion fails.
 
@@ -224,6 +232,16 @@ def run_cmt_inversion(
     profile : bool, optional
         Also write a cProfile dump of the inversion to results/profile.prof,
         by default False.
+    station_df : Path, optional
+        stations_downloaded.csv of an earlier run of the same event; its local
+        miniSEED/StationXML are used instead of downloading again, by default None.
+    gf_store_dir : Path, optional
+        Green's function store shared by the runs of an event, so identical
+        receivers are computed once (needs BayesISOLA with ``gf_store_dir``),
+        by default None.
+    overrides : dict, optional
+        run_auto_cmt keyword arguments replacing the production settings
+        (e.g. a coarser grid for a fast first solution), by default None.
 
     Returns
     -------
@@ -244,6 +262,68 @@ def run_cmt_inversion(
     step_x_km = 1.0 if mag_event <= 5.0 else 2.0
     client = FDSNClient(base_url=NRT_BASE_URL) if real_time else "GEONET"
 
+    # Publish cmt_solution.csv before the (slow) figures when BayesISOLA allows it
+    early_outputs: dict[str, Any] = {}
+    extra_kwargs = {}
+    if "solution_callback" in inspect.signature(run_auto_cmt).parameters:
+
+        def publish_solution(run: dict) -> None:
+            early_outputs["cmt_solution_path"] = write_cmt_solution_csv(
+                run, event_row, output_dir
+            )
+            print(
+                f"\nWrote CMT solution summary to {early_outputs['cmt_solution_path']}"
+            )
+
+        extra_kwargs["solution_callback"] = publish_solution
+    if gf_store_dir is not None:
+        if "gf_store_dir" not in inspect.signature(run_auto_cmt).parameters:
+            raise ValueError(
+                "gf_store_dir needs a BayesISOLA version with a Green's function store"
+            )
+        extra_kwargs["gf_store_dir"] = gf_store_dir
+    if station_df is not None:
+        # same stations and files as the earlier run, no second download
+        extra_kwargs["waveform_source"] = "local"
+        extra_kwargs["station_df"] = station_df
+
+    # Production settings, then optional extras and overrides
+    options = {
+        "output_dir": output_dir,
+        "velocity_model": velocity_model,
+        "client": client,
+        "min_radius_km": min_radius_km,
+        "max_radius_km": max_radius_km,
+        "location_unc_km": 3.0,
+        "time_unc_s": 3.0,
+        "min_depth_km": 3.0,
+        "min_depth_multiplier": 0.3,
+        "max_depth_multiplier": 3.0,
+        "step_x_km": step_x_km,
+        "step_z_km": 1.0,
+        "adaptive_grid_search": {
+            "adaptive_grid": True,
+            "adaptive_refine_factor": 0,
+        },
+        "drop_stations": drop_stations or None,
+        "azimuth_control": AZIMUTH_CONTROL if azimuth_control else None,
+        "station_jackknife": STATION_JACKKNIFE,
+        "freqmin": 0.02,
+        "freqmax": 0.06,
+        "threads": threads,
+        "covariance": "noise",
+        "crosscovariance": True,
+        "deviatoric": deviatoric,
+        "n_uncertainty": 1000,
+        "plot": True,
+        "plot_preset": "summary",
+        "show": False,
+        "html_output": True,
+        "write_report": True,
+    }
+    options.update(extra_kwargs)
+    options.update(overrides or {})
+
     timer = StageTimer()
     profiler = cProfile.Profile() if profile else nullcontext()
     try:
@@ -255,37 +335,7 @@ def run_cmt_inversion(
                 float(event_row["lat"]),
                 float(event_row["depth"]),
                 mag_event,
-                output_dir=output_dir,
-                velocity_model=velocity_model,
-                client=client,
-                min_radius_km=min_radius_km,
-                max_radius_km=max_radius_km,
-                location_unc_km=3.0,
-                time_unc_s=3.0,
-                min_depth_km=3.0,
-                min_depth_multiplier=0.3,
-                max_depth_multiplier=3.0,
-                step_x_km=step_x_km,
-                step_z_km=1.0,
-                adaptive_grid_search={
-                    "adaptive_grid": True,
-                    "adaptive_refine_factor": 0,
-                },
-                drop_stations=drop_stations or None,
-                azimuth_control=AZIMUTH_CONTROL if azimuth_control else None,
-                station_jackknife=STATION_JACKKNIFE,
-                freqmin=0.02,
-                freqmax=0.06,
-                threads=threads,
-                covariance="noise",
-                crosscovariance=True,
-                deviatoric=deviatoric,
-                n_uncertainty=1000,
-                plot=True,
-                plot_preset="summary",
-                show=False,
-                html_output=True,
-                write_report=True,
+                **options,
             )
     finally:
         # Keep timings for failed runs too
@@ -298,8 +348,9 @@ def run_cmt_inversion(
         print(f"\nCMT stage timings:\n{timings_df.to_string(index=False)}")
     run["timings"] = timings_df
 
-    cmt_solution_path = write_cmt_solution_csv(run, event_row, output_dir)
-    print(f"\nWrote CMT solution summary to {cmt_solution_path}")
+    if "cmt_solution_path" not in early_outputs:
+        cmt_solution_path = write_cmt_solution_csv(run, event_row, output_dir)
+        print(f"\nWrote CMT solution summary to {cmt_solution_path}")
 
     return run
 
