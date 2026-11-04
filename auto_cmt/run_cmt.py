@@ -4,7 +4,6 @@ Run the 1-D CMT inversion (BayesISOLA) for a single GeoNet event.
 
 import cProfile
 import inspect
-import os
 import time
 from contextlib import nullcontext
 from pathlib import Path
@@ -31,8 +30,9 @@ NRT_BASE_URL = "https://service-nrt.geonet.org.nz"
 # station/path-specific 1-D Axitra models.
 DEFAULT_NZ_3DVM_PATH = Path(__file__).resolve().parent / "nz3dvm_2p3.csv"
 
-# One Axitra process per core, more only oversubscribes the CPU
-DEFAULT_THREADS = os.cpu_count() or 8
+# Processes per run; the event runs are no longer run in parallel, so each run
+# can use the whole machine
+DEFAULT_THREADS = 16
 
 # Columns the event CSV must provide
 REQUIRED_EVENT_COLUMNS = ["evid", "datetime", "lat", "lon", "depth", "mag"]
@@ -215,7 +215,7 @@ def run_cmt_inversion(
         Query GeoNet's near-real-time FDSN client instead of the standard
         "GEONET" client, by default False.
     threads : int, optional
-        Axitra thread count, by default 12.
+        Axitra/inversion processes, by default 16.
     min_radius_km : float, optional
         Inner radius (km) of the station search annulus, by default 0.0.
     max_radius_km : float, optional

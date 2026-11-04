@@ -33,20 +33,6 @@ DEFAULT_OUTLIER_Z = 5.0
 DEFAULT_OUTLIER_VR_FLOOR = -1.0
 MIN_STATIONS_AFTER_DROP = 5
 
-RUN_FAST = "fast_first"
-
-# Quick preliminary solution: fixed coarser grid, no robustness extras, no figures
-FAST_FIRST_OVERRIDES = {
-    "adaptive_grid_search": None,
-    "station_jackknife": None,
-    "n_uncertainty": None,
-    "step_x_km": 2.0,
-    "step_z_km": 2.0,
-    "plot": False,
-    "html_output": False,
-    "write_report": False,
-}
-
 GF_STORE_DIRNAME = "gf_store"
 STATION_VR_FILENAME = "station_vr.csv"
 EVENT_TIMINGS_FILENAME = "event_timings.csv"
@@ -228,25 +214,23 @@ def run_cmt_event(
     outlier_z: Annotated[float, typer.Option()] = DEFAULT_OUTLIER_Z,
     outlier_vr_floor: Annotated[float, typer.Option()] = DEFAULT_OUTLIER_VR_FLOOR,
     share_work: Annotated[bool, typer.Option()] = True,
-    fast_first: Annotated[bool, typer.Option()] = False,
-    overlap_figures: Annotated[bool, typer.Option()] = False,
+    background_figures: Annotated[bool, typer.Option()] = True,
     shared_xl: Annotated[bool, typer.Option()] = False,
 ) -> pd.DataFrame:
     """
     Run the all_stations, azimuth and drop_outliers_dev CMT runs of one event.
 
-    Same three runs and outlier rule as the NZGMDB pipeline, run one after
-    another with all cores. With ``share_work`` the waveforms are downloaded
-    once and all runs share one Green's function store (identical receivers
-    are computed once), which does not change any result.
+    Same three runs and outlier rule as the NZGMDB pipeline, but run one after
+    another, each with all ``threads`` (drop_outliers_dev needs the station
+    fits of the first two anyway). With ``share_work`` the waveforms are
+    downloaded once and all runs share one Green's function store (identical
+    receivers are computed once), which does not change any result.
 
-    ``fast_first`` first runs a quick preliminary solution (fast_first/:
-    azimuth-selected stations, fixed 2 km grid, no jackknife, uncertainty or
-    figures) to publish while the full runs continue. ``shared_xl`` lets the
-    station-subset runs reuse the all_stations Green's functions. ``overlap_figures`` runs
-    each variant in its own process and starts the next one as soon as the
-    previous has written cmt_solution.csv, so figures are drawn while the next
-    inversion computes.
+    With ``background_figures`` each run is its own process: as soon as it has
+    written cmt_solution.csv the next run starts, while its figures and HTML
+    report are drawn in the background. ``shared_xl`` (off by default) lets the
+    station-subset runs reuse the all_stations Green's functions at the cost of
+    a small numerical change.
 
     Parameters
     ----------
@@ -268,10 +252,9 @@ def run_cmt_event(
         Station VR a station must fall below to be an outlier.
     share_work : bool, optional
         Download once and share the Green's function store between runs.
-    fast_first : bool, optional
-        Publish a quick preliminary solution before the three full runs.
-    overlap_figures : bool, optional
-        Start the next run while the previous one draws its figures.
+    background_figures : bool, optional
+        Start the next run as soon as the previous one has written its
+        solution, drawing its figures in the background.
     shared_xl : bool, optional
         Give the azimuth and drop_outliers_dev runs the all_stations run's
         Axitra ``xl`` so they reuse its Green's functions (small numerical
@@ -303,7 +286,7 @@ def run_cmt_event(
             "gf_store_dir": gf_store_dir,
             **kwargs,
         }
-        if overlap_figures:
+        if background_figures:
             (run_dir / CMT_SOLUTION_FILENAME).unlink(missing_ok=True)
             process = context.Process(
                 target=_run_variant, args=(event_row, run_dir, velocity_model, kwargs)
@@ -322,9 +305,6 @@ def run_cmt_event(
         )
         return run_dir
 
-    if fast_first:
-        # own (shorter) download: the adaptive full runs need a longer window
-        run(RUN_FAST, None, azimuth_control=True, overrides=FAST_FIRST_OVERRIDES)
     all_dir = run(RUN_ALL_STATIONS, None)
     downloaded = (
         all_dir / "metadata" / "stations_downloaded.csv" if share_work else None
@@ -358,7 +338,7 @@ def run_cmt_event(
         {"run": "all solutions", "solution_at_s": time.perf_counter() - start}
     )
 
-    # figures still being drawn by overlapped runs
+    # figures still being drawn in the background
     for name, run_start, process in background:
         process.join()
         if process.exitcode != 0:
