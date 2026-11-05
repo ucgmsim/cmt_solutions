@@ -33,6 +33,9 @@ BAYESISOLA_STAGES = [
         "BayesISOLA.workflows",
         "_calculate_or_verify_axitra_multimodel",
     ),
+    # single crust model (the production path) is timed under the same label
+    ("greens_functions", "BayesISOLA", "process_data.calculate_or_verify_Green"),
+    ("shift_data", "BayesISOLA", "process_data.decimate_shift"),
     ("adaptive_grid_stage", "BayesISOLA.workflows", "_run_adaptive_axitra_stage"),
     ("covariance", "BayesISOLA", "covariance_matrix.__init__"),
     ("mt_inversion", "BayesISOLA", "resolve_MT.__init__"),

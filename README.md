@@ -4,7 +4,7 @@ This repository contains the Centroid Moment Tensor (CMT) solutions and supporti
 
 Contents
 - `cmt_solutions/` — Python package with helpers for reading and working with CMT solution data (includes `cmt_data.py`, `nodal_plane.py`, etc.).
-- `auto_cmt/` — runs BayesISOLA's automated 1-D CMT inversion for a single GeoNet event (`run_cmt.py`), for any event already in GeoNet's archive or, with `--real-time`, for one that has only just happened. Installed as the `auto_cmt` package so callers can launch it as a subprocess (`python -m auto_cmt.run_cmt ...`); see NZGMDB's `nzgmdb.management.background` for an example launcher.
+- `auto_cmt/` — runs BayesISOLA's automated 1-D CMT inversion for a single GeoNet event (`run_cmt.py`), for any event already in GeoNet's archive or, with `--real-time`, for one that has only just happened. Installed as the `auto_cmt` package so callers can launch it as a subprocess (`python -m auto_cmt.run_cmt ...`); see NZGMDB's `nzgmdb.management.background` for an example launcher. `run_event.py` runs the three production runs of an event (all_stations, azimuth, drop_outliers_dev) one after another, sharing the download and Green's functions and drawing each run's figures in the background (see the Auto CMT wiki page).
 - `cmt_solutions/data/` — CSV datasets (e.g. `CMT_solutions.csv`) used by the code and reviewer app.
 - `interfaces/` — Streamlit UI for reviewing nodal planes (`cmt_reviewer.py`).
 - `scripts/` — utility scripts used to build or update datasets.
