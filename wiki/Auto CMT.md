@@ -50,7 +50,7 @@ Run `python auto_cmt/run_cmt.py --help` for the full list of options (thread cou
 
 | Setting | Value |
 |---|---|
-| Frequency band | 0.02–0.06 Hz |
+| Frequency band | 0.04–0.08 Hz below ML 4.5, 0.02–0.06 Hz otherwise |
 | Location / time uncertainty | 3.0 km / 3.0 s |
 | Horizontal grid step | 1 km for M ≤ 5.0, otherwise 2 km |
 | Depth search | min 3 km, 0.3–3.0 × catalogue depth, 1 km step |
