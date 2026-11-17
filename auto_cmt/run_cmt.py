@@ -52,6 +52,31 @@ STATION_JACKKNIFE = {
 
 CMT_SOLUTION_FILENAME = "cmt_solution.csv"
 
+# Inversion band (Hz). Small events have little energy below 0.04 Hz, where
+# long period noise dominates, so they use a higher band (batch test of 13
+# SeismicNow events, ML 3.5-4.5)
+PRODUCTION_BAND = (0.02, 0.06)
+SMALL_EVENT_BAND = (0.04, 0.08)
+SMALL_EVENT_MAX_MAG = 4.5
+
+
+def inversion_band(magnitude: float) -> tuple[float, float]:
+    """
+    Get the inversion frequency band for an event magnitude.
+
+    Parameters
+    ----------
+    magnitude : float
+        Catalogue magnitude of the event.
+
+    Returns
+    -------
+    tuple[float, float]
+        (freqmin, freqmax) in Hz, SMALL_EVENT_BAND below SMALL_EVENT_MAX_MAG,
+        PRODUCTION_BAND otherwise.
+    """
+    return SMALL_EVENT_BAND if magnitude < SMALL_EVENT_MAX_MAG else PRODUCTION_BAND
+
 
 def build_nz_velocity_grid(nz_3dvm_path: Path = DEFAULT_NZ_3DVM_PATH) -> Any:
     """
@@ -260,6 +285,7 @@ def run_cmt_inversion(
 
     mag_event = float(event_row["mag"])
     step_x_km = 1.0 if mag_event <= 5.0 else 2.0
+    freqmin, freqmax = inversion_band(mag_event)
     client = FDSNClient(base_url=NRT_BASE_URL) if real_time else "GEONET"
 
     # Publish cmt_solution.csv before the (slow) figures when BayesISOLA allows it
@@ -308,8 +334,8 @@ def run_cmt_inversion(
         "drop_stations": drop_stations or None,
         "azimuth_control": AZIMUTH_CONTROL if azimuth_control else None,
         "station_jackknife": STATION_JACKKNIFE,
-        "freqmin": 0.02,
-        "freqmax": 0.06,
+        "freqmin": freqmin,
+        "freqmax": freqmax,
         "threads": threads,
         "covariance": "noise",
         "crosscovariance": True,
